@@ -40,6 +40,22 @@ final class ControlEngine {
         capture.handler = { [weak self] type, event in
             self?.handle(type: type, event: event) ?? false
         }
+        capture.onPermissionLost = { [weak self] in
+            self?.permissionLost()
+        }
+    }
+
+    /// Accessibility was revoked: the tap is already gone, put the local cursor back and
+    /// drop any remote session so nothing is left hidden, frozen or held down.
+    private func permissionLost() {
+        returnHome()
+        cursor.attach(at: CGEvent(source: nil)?.location ?? DisplayInfo.parkPoint())
+        if let driver = controlledBy {
+            injector.releaseAll()
+            controlledBy = nil
+            send?(driver, .takeover(.localInput))
+        }
+        onStateChange?()
     }
 
     var isCapturing: Bool { capture.isRunning }

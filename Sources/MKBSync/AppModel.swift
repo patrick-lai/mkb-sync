@@ -390,6 +390,7 @@ final class AppModel: ObservableObject {
         let granted = Permissions.allGranted
         if granted != permissionsGranted { permissionsGranted = granted }
         if online && !engine.isCapturing && Permissions.accessibility { engine.start() }
+        if engine.isCapturing && !Permissions.accessibility { engine.stop() }
 
         let now = Date()
         for s in sessions.values {

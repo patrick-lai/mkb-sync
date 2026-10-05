@@ -64,6 +64,14 @@ Choose **Settings ▸ Universal Control ▸ Ignore Universal Control** to switch
 
 Requires macOS 13 Ventura or later. Runs on Apple silicon and Intel.
 
+## Troubleshooting
+
+**Keyboard or clicks stop working.** If macOS stops trusting the app while its event tap
+is installed, clicks and keystrokes are dropped system-wide. MKB Sync now watches its
+Accessibility permission and removes the tap within a quarter of a second if the
+permission is revoked. If you are ever stuck on an older build, quit the app from another
+machine (`ssh <mac> killall MKBSync`) or hold the power button to restart.
+
 ## Build from source
 
 ```sh
