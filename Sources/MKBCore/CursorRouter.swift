@@ -56,7 +56,7 @@ public final class CursorRouter {
         // Only hand off when the cursor is pinned against an outer edge in the direction of travel.
         let step = VPoint(sign(delta.x), sign(delta.y))
         guard !desktop.contains(v + step, device: localID) else { return .none }
-        guard let (target, p) = findTarget(from: v, delta: delta, excluding: [localID]) else { return .none }
+        guard case let (target, p)? = findTarget(from: v, delta: delta, excluding: [localID]) else { return .none }
         lastLocalExit = location
         active = target
         cursor = p
@@ -71,7 +71,7 @@ public final class CursorRouter {
             cursor = candidate
             return .move(device: active, to: desktop.toLocal(candidate, on: active))
         }
-        if let (target, p) = findTarget(from: cursor, delta: delta, excluding: [active]) {
+        if case let (target, p)? = findTarget(from: cursor, delta: delta, excluding: [active]) {
             if target == localID {
                 active = localID
                 cursor = p

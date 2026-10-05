@@ -124,5 +124,5 @@ Sources/
   pause-on-use signal may stop firing.
 - Dragging files between Macs is not supported. Copy and paste works through the shared
   clipboard.
-- Secure input fields (for example password prompts with Secure Keyboard Entry) block event
-  taps by design, on purpose by macOS.
+- While Secure Keyboard Entry is on (for example in password prompts), macOS blocks event
+  taps by design.
