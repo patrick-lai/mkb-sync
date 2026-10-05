@@ -33,6 +33,18 @@ final class ControlEngine {
     /// Keys/buttons forwarded to `controlling` that still need releasing.
     private var forwarded = PressedInputs()
 
+    /// macOS reports our own cursor warps as movement in the next motion event; this is the
+    /// jump to strip from it. Without this, parking the cursor (edge → centre) reads as a
+    /// big swipe back toward home and the cursor ping-pongs between Macs.
+    private var pendingWarp: VPoint?
+    private var warpedAt = Date.distantPast
+    /// No crossings for a moment after each crossing, so one jerk can't bounce the cursor back.
+    private var lastTransition = Date.distantPast
+    private static let transitionCooldown: TimeInterval = 0.3
+    /// If the hidden cursor drifts this far from its park point (association can be ignored
+    /// for background apps), put it back.
+    private static let reparkDistance: Double = 120
+
     init(localID: String, uc: UniversalControlMonitor) {
         self.localID = localID
         self.uc = uc
@@ -98,6 +110,11 @@ final class ControlEngine {
     // MARK: - Messages from peers
 
     func peerEntered(_ peer: String, at point: VPoint) {
+        guard Permissions.postEvents else {
+            // We could not replay anything; send the cursor straight back.
+            send?(peer, .takeover(.localInput))
+            return
+        }
         if isSuspended || uc.isDrivingThisMac {
             send?(peer, .takeover(.universalControl))
             return
@@ -169,7 +186,8 @@ final class ControlEngine {
 
         guard !isSuspended, controlledBy == nil, type == .mouseMoved, physical.buttons.isEmpty else { return false }
         let location = event.location
-        let action = router.localMove(location: VPoint(location.x, location.y), delta: delta(of: event))
+        router.transitionsLocked = inCooldown
+        let action = router.localMove(location: VPoint(location.x, location.y), delta: motionDelta(of: event))
         if case let .enter(device, at) = action {
             beginRemote(device, at: at)
             return true
@@ -204,7 +222,9 @@ final class ControlEngine {
             }
         }
         physical.reset()
-        cursor.detach(parkAt: DisplayInfo.parkPoint())
+        lastTransition = Date()
+        let park = DisplayInfo.parkPoint()
+        warp(to: park) { self.cursor.detach(parkAt: park) }
         send?(device, .enter(point))
         if heldFlags != 0, let code = ModifierMask.keyCodes(for: heldFlags).first {
             sendInput(.flagsChanged(code: code, flags: heldFlags))
@@ -221,7 +241,9 @@ final class ControlEngine {
         }
         controlling = nil
         forwarded.reset()
-        cursor.attach(at: CGPoint(x: point.x, y: point.y))
+        lastTransition = Date()
+        let target = CGPoint(x: point.x, y: point.y)
+        warp(to: target) { self.cursor.attach(at: target) }
         onStateChange?()
     }
 
@@ -231,6 +253,7 @@ final class ControlEngine {
         let carriedFlags = forwarded.flags & ModifierMask.deviceIndependent
         forwarded.reset()
         controlling = to
+        lastTransition = Date()
         send?(to, .enter(point))
         if carriedFlags != 0, let code = ModifierMask.keyCodes(for: carriedFlags).first {
             sendInput(.flagsChanged(code: code, flags: carriedFlags))
@@ -247,7 +270,9 @@ final class ControlEngine {
     private func forward(type: CGEventType, event: CGEvent) {
         switch type {
         case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged:
-            let d = delta(of: event)
+            let d = motionDelta(of: event)
+            reparkIfDrifted(event)
+            router.transitionsLocked = inCooldown
             switch router.remoteMove(delta: d) {
             case let .move(_, to):
                 sendInput(.mouseMove(position: to, delta: d))
@@ -336,6 +361,40 @@ final class ControlEngine {
         let code = event.getIntegerValueField(.keyboardEventKeycode)
         let needed: CGEventFlags = [.maskControl, .maskAlternate, .maskCommand]
         return code == 53 && event.flags.contains(needed)
+    }
+
+    private var inCooldown: Bool {
+        Date().timeIntervalSince(lastTransition) < Self.transitionCooldown
+    }
+
+    /// Runs a cursor warp and remembers the jump so the next motion event can be corrected.
+    private func warp(to target: CGPoint, _ body: () -> Void) {
+        let before = CGEvent(source: nil)?.location
+        body()
+        guard let before else { return }
+        let jump = VPoint(target.x - before.x, target.y - before.y)
+        pendingWarp = jump.length > 0.5 ? jump : nil
+        warpedAt = Date()
+    }
+
+    /// Movement of a motion event with any warp we caused removed. The correction is only
+    /// applied when it makes the delta smaller, so it is harmless on macOS versions that do
+    /// not fold warps into the next event.
+    private func motionDelta(of event: CGEvent) -> VPoint {
+        let raw = delta(of: event)
+        guard let jump = pendingWarp else { return raw }
+        pendingWarp = nil
+        guard Date().timeIntervalSince(warpedAt) < 1 else { return raw }
+        let corrected = raw - jump
+        return corrected.length < raw.length ? corrected : raw
+    }
+
+    private func reparkIfDrifted(_ event: CGEvent) {
+        let park = DisplayInfo.parkPoint()
+        let location = event.location
+        let drift = VPoint(location.x - park.x, location.y - park.y)
+        guard drift.length > Self.reparkDistance else { return }
+        warp(to: park) { CGWarpMouseCursorPosition(park) }
     }
 
     private func delta(of event: CGEvent) -> VPoint {

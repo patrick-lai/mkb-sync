@@ -31,6 +31,7 @@ struct PeerRow: Identifiable, Equatable {
     /// Universal Control handles this pair, so MKB Sync leaves its edges alone.
     var nativePair: Bool
     var drivenByUC: Bool
+    var cannotBeControlled: Bool = false
     var weControlIt: Bool
     var itControlsUs: Bool
 }
@@ -162,6 +163,7 @@ final class AppModel: ObservableObject {
         }
         engine.router.isBlocked = { [weak self] id in
             guard let self, let session = self.sessions[id] else { return true }
+            if session.status.canBeControlled == false { return true }
             return !UniversalControlPolicy.mayEnter(local: self.uc.info, peer: session.status.uc, mode: self.ucMode)
         }
 
@@ -438,7 +440,8 @@ final class AppModel: ObservableObject {
     }
 
     private func currentStatus() -> PeerStatus {
-        PeerStatus(uc: uc.info, controlling: engine.controlling, controlledBy: engine.controlledBy)
+        PeerStatus(uc: uc.info, controlling: engine.controlling, controlledBy: engine.controlledBy,
+                   canBeControlled: Permissions.postEvents)
     }
 
     private func sendStatusIfChanged() {
@@ -506,6 +509,7 @@ final class AppModel: ObservableObject {
             PeerRow(id: s.id, name: s.name, state: .connected,
                     nativePair: UniversalControlPolicy.isNativePair(local, s.status.uc),
                     drivenByUC: s.status.uc.drivenByUC,
+                    cannotBeControlled: s.status.canBeControlled == false,
                     weControlIt: engine.controlling == s.id,
                     itControlsUs: engine.controlledBy == s.id)
         }

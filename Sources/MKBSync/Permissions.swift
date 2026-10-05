@@ -25,6 +25,16 @@ enum Permissions {
         open("x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")
     }
 
+    /// macOS only applies a new Accessibility grant to a freshly launched process.
+    static func relaunch() {
+        let path = Bundle.main.bundleURL.path
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/bin/sh")
+        task.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", path]
+        try? task.run()
+        NSApp.terminate(nil)
+    }
+
     private static func open(_ s: String) {
         if let url = URL(string: s) { NSWorkspace.shared.open(url) }
     }

@@ -27,6 +27,9 @@ public final class CursorRouter {
     public var isBlocked: (String) -> Bool = { _ in false }
     /// Gaps between devices smaller than this are jumped over.
     public var gapTolerance: Double = 8
+    /// While true the cursor stays on whichever device has it (a short cooldown after each
+    /// crossing so one jerky movement can't bounce it straight back).
+    public var transitionsLocked = false
 
     public init(localID: String, desktop: VirtualDesktop) {
         self.localID = localID
@@ -51,7 +54,7 @@ public final class CursorRouter {
     /// Mouse moved while the cursor is on this Mac. `location` is the OS cursor position
     /// (already clamped to the screens), `delta` the raw device movement.
     public func localMove(location: VPoint, delta: VPoint) -> Action {
-        guard !isRemote, delta.x != 0 || delta.y != 0 else { return .none }
+        guard !isRemote, !transitionsLocked, delta.x != 0 || delta.y != 0 else { return .none }
         let v = desktop.toVirtual(location, from: localID)
         // Only hand off when the cursor is pinned against an outer edge in the direction of travel.
         let step = VPoint(sign(delta.x), sign(delta.y))
@@ -71,7 +74,7 @@ public final class CursorRouter {
             cursor = candidate
             return .move(device: active, to: desktop.toLocal(candidate, on: active))
         }
-        if case let (target, p)? = findTarget(from: cursor, delta: delta, excluding: [active]) {
+        if !transitionsLocked, case let (target, p)? = findTarget(from: cursor, delta: delta, excluding: [active]) {
             if target == localID {
                 active = localID
                 cursor = p

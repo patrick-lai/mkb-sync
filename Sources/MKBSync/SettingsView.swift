@@ -46,12 +46,16 @@ struct SettingsView: View {
             Section("Permissions") {
                 LabeledContent("Accessibility", value: Permissions.accessibility ? "Granted" : "Not granted")
                 LabeledContent("Post events", value: Permissions.postEvents ? "Granted" : "Not granted")
+                Text("Both are granted by the single Accessibility switch for MKB Sync. “Post events” lets this Mac replay clicks and typing from another Mac. If it still says Not granted after you switched Accessibility on: relaunch. If that doesn’t help, select MKB Sync in the Accessibility list, remove it with −, relaunch and switch it on again (each new download counts as a new app).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 HStack {
                     Button("Open Accessibility Settings") {
                         Permissions.request()
                         Permissions.openAccessibilitySettings()
                     }
-                    Button("Local Network Settings") { Permissions.openLocalNetworkSettings() }
+                    Button("Relaunch MKB Sync") { Permissions.relaunch() }
+                    Button("Local Network…") { Permissions.openLocalNetworkSettings() }
                 }
             }
         }

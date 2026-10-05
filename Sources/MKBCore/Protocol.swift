@@ -63,11 +63,15 @@ public struct PeerStatus: Codable, Equatable, Sendable {
     public var controlling: String?
     /// Device whose keyboard and mouse currently drive this Mac.
     public var controlledBy: String?
+    /// This Mac can replay input (has the Accessibility / post-event permission).
+    /// Optional so peers that predate the field decode as "unknown".
+    public var canBeControlled: Bool?
 
-    public init(uc: UCInfo = UCInfo(), controlling: String? = nil, controlledBy: String? = nil) {
+    public init(uc: UCInfo = UCInfo(), controlling: String? = nil, controlledBy: String? = nil, canBeControlled: Bool? = true) {
         self.uc = uc
         self.controlling = controlling
         self.controlledBy = controlledBy
+        self.canBeControlled = canBeControlled
     }
 }
 

@@ -40,13 +40,18 @@ struct MenuContentView: View {
 
     private var permissionBanner: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label("MKB Sync needs Accessibility access to share your keyboard and mouse.", systemImage: "lock.shield")
+            Label(Permissions.accessibility
+                  ? "Almost there: relaunch MKB Sync so macOS applies the Accessibility permission."
+                  : "MKB Sync needs Accessibility access (System Settings ▸ Privacy & Security ▸ Accessibility) to share your keyboard and mouse.",
+                  systemImage: "lock.shield")
                 .font(.caption)
+                .fixedSize(horizontal: false, vertical: true)
             HStack {
-                Button("Grant Access…") {
+                Button("Open Settings…") {
                     Permissions.request()
                     Permissions.openAccessibilitySettings()
                 }
+                Button("Relaunch") { Permissions.relaunch() }
                 Spacer()
             }
         }
@@ -133,6 +138,7 @@ struct MenuContentView: View {
             if peer.weControlIt { return "Using this Mac's keyboard & mouse" }
             if peer.itControlsUs { return "Controlling this Mac" }
             if peer.drivenByUC { return "Universal Control in use" }
+            if peer.cannotBeControlled { return "Needs Accessibility permission on that Mac" }
             if peer.nativePair && model.ucMode == .automatic { return "Handled by Universal Control" }
             return "Connected"
         }

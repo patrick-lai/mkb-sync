@@ -102,4 +102,18 @@ final class CursorRouterTests: XCTestCase {
         let r = CursorRouter(localID: "a", desktop: VirtualDesktop(devices: devices, layout: layout))
         XCTAssertEqual(r.localMove(location: VPoint(200, 0), delta: VPoint(0, -4)), .enter(device: "b", at: VPoint(200, 1076)))
     }
+
+    func testTransitionsLockedKeepsCursorOnActiveDevice() {
+        let r = makeRouter()
+        r.transitionsLocked = true
+        XCTAssertEqual(r.localMove(location: VPoint(1439, 400), delta: VPoint(5, 0)), .none)
+        r.transitionsLocked = false
+        _ = r.localMove(location: VPoint(1439, 400), delta: VPoint(5, 0))
+        r.transitionsLocked = true
+        // A big jerk back towards a would normally return home; locked, it clamps on b.
+        XCTAssertEqual(r.remoteMove(delta: VPoint(-720, 0)), .move(device: "b", to: VPoint(0, 400)))
+        XCTAssertTrue(r.isRemote)
+        r.transitionsLocked = false
+        XCTAssertEqual(r.remoteMove(delta: VPoint(-5, 0)), .returnLocal(at: VPoint(1435, 400)))
+    }
 }
